@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "C:/projetos/pessoais/go-api/"
+            "program": "/home/matheus/projetos/github/pessoais/go-api"
         }
     ]
 }

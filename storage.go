@@ -1,18 +1,110 @@
 package main
 
-import "database/sql"
+import (
+	"database/sql"
+	_ "github.com/lib/pq"
+	"fmt"
+)
 
 type Storage interface {
-	CreateUser(*User) error
-	DeleteUser(int) error
-	UpdateUser(*User) error
-	GetUserById(int) (*User, error)
+	createUser(*User) error
+	deleteUser(int) error
+	updateUser(*User) error
+	getUsers() ([]*User , error)
+	getUserById(int) (*User, error)
 }
 
-type PostgressStore struct {
+type PostgresStore struct {
 	db *sql.DB
 }
 
-func newPostgressStore() (*PostgressStore, error) {
+func newPostgressStore() (*PostgresStore, error) {
+	connStr := "user=postgres dbname=postgres password=907010 sslmode=disable"
 
+	db,err := sql.Open("postgres",connStr)
+	if err != nil {
+		return nil,err
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil,err
+	}
+
+	return &PostgresStore{
+		db:db,
+	},nil
+}
+
+func (s *PostgresStore) init() error{
+	return s.createTable()
+}
+
+func (s *PostgresStore) createTable() error{
+	query := `create table  if not exists users (
+         id serial primary key,
+		 email varchar(50),
+		 username  varchar(50),
+		 created_at  timestamp
+ 	)`
+
+	_,err := s.db.Exec(query)
+	return err
+}
+
+func (s *PostgresStore) createUser( u *User) error {
+	query := `
+			insert into users 
+			(email,username,created_at) 
+			values 
+			($1,$2,$3)
+		`
+	resp,err := s.db.Query(query,u.Email,u.UserName,u.CreatedAt)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%+v\n",resp)
+	return nil;
+}
+
+func (s *PostgresStore) updateUser(*User) error {
+	return nil;
+}
+
+func (s *PostgresStore) deleteUser(id int) error {
+	_,err := s.db.Query("delete from users where id = $1",id)
+	return err;
+}
+
+func (s *PostgresStore) getUserById(id int) (*User,error) {
+	rows , err := s.db.Query("select * from users where id = $1",id)
+	if err != nil {
+		return nil,err
+	}
+	for rows.Next() {
+		return scanIntoUser(rows)
+	}
+	return nil,fmt.Errorf("account %d not found" , id);
+}
+
+func (s *PostgresStore) getUsers() ([]*User,error) {
+	rows , err := s.db.Query("select * from users")
+	if err != nil {
+		return nil,err
+	}
+	users := []*User{}
+	for rows.Next() {
+		user,err := scanIntoUser(rows)
+        if err != nil {
+			return nil,err
+		}
+		users = append(users,user)
+	}
+	return users,nil;
+}
+
+func scanIntoUser(rows *sql.Rows) (*User,error){
+	user := new(User)
+	err := rows.Scan(&user.ID,&user.Email,&user.UserName,&user.CreatedAt)
+
+	return user,err;
 }
