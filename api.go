@@ -27,13 +27,47 @@ func newAPIServer(listenAddr string, store Storage) *APIServer {
 
 func (s *APIServer) run() {
 	router := mux.NewRouter()
-
+	
+	router.HandleFunc("/login", makeHTTPhandleFunc(s.handleLogin))
 	router.HandleFunc("/user", makeHTTPhandleFunc(s.handleUser))
 	router.HandleFunc("/user/{id}", withJWTAuth(makeHTTPhandleFunc(s.handleGetUserById)))
 
 	log.Println("JSON API server running on port ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }
+
+func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != "POST" {
+		return fmt.Errorf("method not allowed %s", r.Method)
+	}
+
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return err
+	}
+
+	user, err := s.store.getAccountByUserName(req.UserName)
+	if err != nil {
+		return err
+	}
+
+	if !user.ValidPassword(user.Password) {
+		return fmt.Errorf("not authenticated")
+	}
+
+	token, err := createJWT(user)
+	if err != nil {
+		return err
+	}
+
+	resp := LoginResponse{
+		Token:  token,
+		UserName: user.UserName,
+	}
+
+	return WriteJSON(w, http.StatusOK, resp)
+}
+
 
 func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
