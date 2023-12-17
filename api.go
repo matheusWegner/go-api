@@ -27,7 +27,6 @@ func newAPIServer(listenAddr string, store Storage) *APIServer {
 
 func (s *APIServer) run() {
 	router := mux.NewRouter()
-	
 	router.HandleFunc("/login", makeHTTPhandleFunc(s.handleLogin))
 	router.HandleFunc("/user", makeHTTPhandleFunc(s.handleUser))
 	router.HandleFunc("/user/{id}", withJWTAuth(makeHTTPhandleFunc(s.handleGetUserById)))
@@ -51,7 +50,7 @@ func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if !user.ValidPassword(user.Password) {
+	if !user.ValidPassword(req.Password) {
 		return fmt.Errorf("not authenticated")
 	}
 
@@ -61,13 +60,12 @@ func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	resp := LoginResponse{
-		Token:  token,
+		Token:    token,
 		UserName: user.UserName,
 	}
 
 	return WriteJSON(w, http.StatusOK, resp)
 }
-
 
 func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
@@ -116,7 +114,7 @@ func (s *APIServer) handleCreateUser(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
-	user := newUser(createUserRequest.Email, createUserRequest.UserName)
+	user, err := newUser(createUserRequest.Email, createUserRequest.UserName, createUserRequest.Password)
 
 	if err := s.store.createUser(user); err != nil {
 		return nil
@@ -167,9 +165,12 @@ func withJWTAuth(hendlerFunc http.HandlerFunc) http.HandlerFunc {
 		}
 
 		//        userID := getID(r);
+		//user,err := store.getUserByJWTTOKEN(token)
+		//err
 
-		claims := token.Claims.(jwt.MapClaims)
-		fmt.Println(claims)
+		//claims := token.Claims.(jwt.MapClaims)
+		//if claims["ID"] == user.ID
+		//fmt.Println(claims)
 
 		hendlerFunc(w, r)
 	}
